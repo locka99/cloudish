@@ -1,0 +1,88 @@
+# cloudish configuration
+#
+# Loaded from ./cloudish.yaml first, then ~/.cloudish/config.yaml as a fallback.
+# Command-line flags (when implemented) take precedence over this file.
+
+# ── Server ────────────────────────────────────────────────────────────────────
+
+server:
+  # Address and port to listen on.
+  host: "0.0.0.0"
+  port: 4566
+
+  # Simulated AWS region returned in responses and used in ARN construction.
+  region: "eu-west-1"
+
+  # Simulated AWS account ID used in ARNs.
+  account_id: "000000000000"
+
+# ── Storage ───────────────────────────────────────────────────────────────────
+
+storage:
+  # Root directory for all file-backed service data.
+  # Each service writes under {data_dir}/{service}/.
+  data_dir: "data"
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+
+# Pre-seeded credentials that are accepted before IAM is configured.
+# These mirror the defaults used by LocalStack and most AWS local-dev tooling.
+credentials:
+  - access_key: "test"
+    secret_key: "test"
+    # Optional: restrict to a specific IAM user ARN.
+    # user_arn: "arn:aws:iam::000000000000:root"
+
+# ── RDS proxy ─────────────────────────────────────────────────────────────────
+
+rds:
+  # Postgres DSN to proxy RDS wire-protocol connections to.
+  # The emulator forwards TCP connections from callers directly to this server.
+  # Format: postgresql://[user[:password]@][host][:port][/dbname]
+  proxy_dsn: "postgresql://postgres:postgres@localhost:5432/cloudish"
+
+  # Port cloudish listens on for incoming Postgres wire-protocol connections.
+  # Callers point their Postgres client at this port instead of the real DB.
+  proxy_port: 5433
+
+# ── S3 ────────────────────────────────────────────────────────────────────────
+
+s3:
+  # Maximum object size accepted in a single PutObject request (bytes).
+  # Default: 5 GiB
+  max_object_size: 5368709120
+
+  # Presigned URL maximum expiry allowed (seconds). Default: 7 days.
+  max_presign_expiry: 604800
+
+# ── DynamoDB ─────────────────────────────────────────────────────────────────
+
+dynamodb:
+  # How often the TTL expiry background task runs (seconds).
+  ttl_sweep_interval: 60
+
+# ── SQS ───────────────────────────────────────────────────────────────────────
+
+sqs:
+  # Maximum time a ReceiveMessage long-poll may wait for a message (seconds).
+  # AWS maximum is 20; can be raised here for local dev.
+  max_wait_time: 20
+
+  # Default message retention period (seconds). AWS default is 4 days.
+  default_retention: 345600
+
+# ── Cognito ───────────────────────────────────────────────────────────────────
+
+cognito:
+  # Access token validity (seconds). Default: 1 hour.
+  access_token_ttl: 3600
+
+  # Refresh token validity (seconds). Default: 30 days.
+  refresh_token_ttl: 2592000
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+
+logging:
+  # Log level: error | warn | info | debug | trace
+  # Can be overridden with the RUST_LOG environment variable.
+  level: "info"

@@ -8,6 +8,7 @@ This project shall emulate the APIs for following AWS services
 - SES
 - SQS
 - IAM (basics)
+- CloudWatch
 
 For each of these the APIs will be backed by persistent storage that will hold data under a subdirectory of `data/`
 except for RDS which will map to a Postgres database of my choosing.
