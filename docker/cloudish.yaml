@@ -1,0 +1,62 @@
+# cloudish configuration — Docker image
+#
+# This file is baked into the Docker image at /etc/cloudish/cloudish.yaml.
+# Override individual values with environment variables or by bind-mounting
+# your own config over this file:
+#
+#   docker run -v ./my-cloudish.yaml:/etc/cloudish/cloudish.yaml ...
+
+# ── Server ────────────────────────────────────────────────────────────────────
+
+server:
+  host: "0.0.0.0"
+  port: 4566
+  region: "eu-west-1"
+  account_id: "000000000000"
+
+# ── Storage ───────────────────────────────────────────────────────────────────
+
+storage:
+  # Mapped to the /data Docker volume.
+  data_dir: "/data"
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+
+credentials:
+  - access_key: "test"
+    secret_key: "test"
+
+# ── RDS proxy ─────────────────────────────────────────────────────────────────
+
+rds:
+  # Postgres runs in the same container, so we connect on localhost.
+  proxy_dsn: "postgresql://postgres:postgres@127.0.0.1:5432/cloudish"
+  proxy_port: 5433
+
+# ── S3 ────────────────────────────────────────────────────────────────────────
+
+s3:
+  max_object_size: 5368709120
+  max_presign_expiry: 604800
+
+# ── DynamoDB ─────────────────────────────────────────────────────────────────
+
+dynamodb:
+  ttl_sweep_interval: 60
+
+# ── SQS ───────────────────────────────────────────────────────────────────────
+
+sqs:
+  max_wait_time: 20
+  default_retention: 345600
+
+# ── Cognito ───────────────────────────────────────────────────────────────────
+
+cognito:
+  access_token_ttl: 3600
+  refresh_token_ttl: 2592000
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+
+logging:
+  level: "info"
