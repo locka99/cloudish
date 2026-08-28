@@ -1,0 +1,92 @@
+This project shall emulate the APIs for following AWS services
+
+- S3
+- DynamoDB
+- Cognito
+- AppConfig
+- RDS
+- SES
+- SQS
+- IAM (basics)
+
+For each of these the APIs will be backed by persistent storage that will hold data under a subdirectory of `data/`
+except for RDS which will map to a Postgres database of my choosing.
+
+Code will be structured such that new services can be implemented. Services will be tested with unit tests and integration tests.
+
+Services shall be implemented with tokio.
+
+Services will test basic AWS credentials to apply IAM policy to the session.
+
+## Architecture Decisions
+
+1. **SigV4 strictness** — parse the `Authorization` header to extract the access key and credential scope, but do not verify the HMAC-SHA256 signature. Any well-formed signature is accepted.
+
+2. **S3 routing** — support both path-based (`http://localhost:4566/bucket/key`) and host-based (`http://bucket.localhost:4566/key`). Object metadata (Content-Type, ETag, user metadata, etc.) is stored in a sibling `.metadata` JSON file alongside the object data.
+
+3. **RDS** — proxy the Postgres wire protocol to a real Postgres instance. Proxy target and all other runtime settings are configured via `cloudish.yaml` in the working directory.
+
+4. **Cognito JWT signing** — issue real RS256-signed JWTs. Generate an RSA keypair on first run and persist it under `data/cognito/`.
+
+5. **Ports** — single port 4566 for all services. Callers configure each AWS SDK client with `endpoint_url = "http://localhost:4566"`. (Same model as LocalStack v2+.)
+
+6. **Default credentials** — access key `test`, secret key `test`. Pre-seeded so callers work before IAM is configured.
+
+7. **AWS account ID** — `000000000000` used in all ARNs.
+
+8. **Default region** — `eu-west-1`.
+
+9. **Config file** — `cloudish.yaml` loaded from the working directory first, then `~/.cloudish/config.yaml` as a fallback.
+
+10. **S3 versioning** — simple suffix scheme: `{key}_0`, `{key}_1`, etc. Metadata file tracks version history.
+
+11. **S3 presigned URLs** — supported for GET and PUT.
+
+12. **S3 multipart upload** — supported.
+
+## Open Questions
+
+### DynamoDB
+- **GSI / LSI** — support Global and Local Secondary Indexes? (significant complexity)
+
+Not now
+
+- **DynamoDB Streams** — yes or no?
+
+yes
+
+- **TTL** — automatically expire items with a TTL attribute?
+
+yes
+
+### SQS
+- **FIFO queues** — support `.fifo` queue names with deduplication?
+
+Yes
+
+- **Dead-letter queues** — yes or no?
+
+Yes
+
+- **Long polling** — hold `ReceiveMessage` requests open until a message arrives (requires async wait)?
+
+Yes
+
+
+### SES
+- **Storage of sent mail** — save sent emails to `data/ses/sent/` as JSON (headers + body)?
+
+Yes
+
+- **SMTP interface** — expose an SMTP server in addition to the HTTP API, so mail clients can send directly?
+
+No
+
+### Cognito
+- **Auth flows** — which to support: `USER_PASSWORD_AUTH`, `USER_SRP_AUTH`, `REFRESH_TOKEN_AUTH`? SRP is complex.
+
+USER_PASSWORD_AUTH
+
+- **MFA** — yes or no?
+
+No
