@@ -62,7 +62,12 @@ pub async fn list_buckets(State(state): State<Arc<AppState>>) -> impl IntoRespon
 pub async fn create_bucket(
     State(state): State<Arc<AppState>>,
     Path(bucket): Path<String>,
+    request: axum::extract::Request,
 ) -> impl IntoResponse {
+    // The AWS SDK sends a CreateBucketConfiguration XML body. We must drain it
+    // before responding so the HTTP/1.1 keep-alive connection remains usable
+    // for subsequent requests on the same socket.
+    let _ = axum::body::to_bytes(request.into_body(), usize::MAX).await;
     let store = S3Store::new(state.s3.base_dir.clone());
     match store.create_bucket(&bucket, DEFAULT_REGION).await {
         Ok(_) => Response::builder()

@@ -63,3 +63,10 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 21. **Cognito auth flows** — `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` only. SRP not supported.
 
 22. **Cognito MFA** — not supported.
+
+## Testing Rules
+
+- Every integration test **must** clean up all resources it creates (buckets, queues, tables, etc.), even if the test fails or panics.
+- Test data is stored under `data/test_{port}/` (isolated from `data/`). This directory is wiped at the start of each test run.
+- Use a drop-guard (`TestCleanup`) to ensure cleanup runs on panic. Never rely solely on an explicit `cleanup()` call at the end of a test body.
+- Each test must use a unique resource name (e.g. UUID-based bucket/queue/table name) to avoid cross-test interference when tests run in parallel.
