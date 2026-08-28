@@ -44,49 +44,22 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 
 12. **S3 multipart upload** — supported.
 
-## Open Questions
+13. **DynamoDB GSI/LSI** — not supported (deferred; too complex for now).
 
-### DynamoDB
-- **GSI / LSI** — support Global and Local Secondary Indexes? (significant complexity)
+14. **DynamoDB Streams** — supported.
 
-Not now
+15. **DynamoDB TTL** — supported; items with an expired TTL attribute are automatically expired.
 
-- **DynamoDB Streams** — yes or no?
+16. **SQS FIFO queues** — supported (`.fifo` queue names with deduplication).
 
-yes
+17. **SQS dead-letter queues** — supported.
 
-- **TTL** — automatically expire items with a TTL attribute?
+18. **SQS long polling** — supported; `ReceiveMessage` holds the connection open until a message arrives or the wait timeout expires.
 
-yes
+19. **SES sent mail storage** — sent emails saved to `data/ses/sent/` as JSON (headers + body).
 
-### SQS
-- **FIFO queues** — support `.fifo` queue names with deduplication?
+20. **SES SMTP interface** — not supported; HTTP API only.
 
-Yes
+21. **Cognito auth flows** — `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` only. SRP not supported.
 
-- **Dead-letter queues** — yes or no?
-
-Yes
-
-- **Long polling** — hold `ReceiveMessage` requests open until a message arrives (requires async wait)?
-
-Yes
-
-
-### SES
-- **Storage of sent mail** — save sent emails to `data/ses/sent/` as JSON (headers + body)?
-
-Yes
-
-- **SMTP interface** — expose an SMTP server in addition to the HTTP API, so mail clients can send directly?
-
-No
-
-### Cognito
-- **Auth flows** — which to support: `USER_PASSWORD_AUTH`, `USER_SRP_AUTH`, `REFRESH_TOKEN_AUTH`? SRP is complex.
-
-USER_PASSWORD_AUTH
-
-- **MFA** — yes or no?
-
-No
+22. **Cognito MFA** — not supported.

@@ -38,32 +38,14 @@ fn start_server_sync() -> u16 {
         });
     });
 
-    // Give the server a moment to start accepting connections
-    std::thread::sleep(std::time::Duration::from_millis(200));
-
-    // Verify the server is reachable with retry
+    // Give the server a moment to start accepting connections.
+    // Retry up to 1 second in case the OS needs time to bind.
     for _ in 0..20 {
         if std::net::TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok() {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-
-    // Probe with a raw PUT to verify routing works
-    let test_bucket = "probe-bucket-12345";
-    let probe_result = std::process::Command::new("curl")
-        .args([
-            "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "-X", "PUT",
-            &format!("http://127.0.0.1:{}/{}/", port, test_bucket),
-        ])
-        .output();
-    match probe_result {
-        Ok(out) => eprintln!("[test-server] probe PUT /{test_bucket}/ → HTTP {}", String::from_utf8_lossy(&out.stdout)),
-        Err(e) => eprintln!("[test-server] probe failed: {e}"),
-    }
-
-    eprintln!("[test-server] listening on port {port}");
     port
 }
 
