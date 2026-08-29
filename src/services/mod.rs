@@ -96,6 +96,7 @@ async fn top_level_dispatch(
 
         match service.as_str() {
             "iam" | "sts" => iam::dispatch(State(state.0.clone()), request).await.into_response(),
+            "sqs" => sqs::service_dispatch(State(state.0.clone()), request).await.into_response(),
             _ => (
                 StatusCode::BAD_REQUEST,
                 format!("unknown target: {target}"),
