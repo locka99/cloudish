@@ -7,7 +7,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | Service | Status |
 |---------|--------|
 | S3 | Implemented |
-| DynamoDB | Stub |
+| DynamoDB | Implemented |
 | Cognito | Stub |
 | AppConfig | Stub |
 | RDS | Proxy (Postgres wire protocol) |
@@ -127,13 +127,15 @@ s3 = boto3.client(
 aws --endpoint-url http://localhost:4566 s3 ls
 ```
 
-**AWS CLI profile (`~/.aws/config`):**
+**AWS CLI profile (`~/.aws/config` and `~/.aws/credentials`):**
 ```ini
+# ~/.aws/config
 [profile cloudish]
 endpoint_url = http://localhost:4566
 region = eu-west-1
 
-[profile cloudish]
+# ~/.aws/credentials
+[cloudish]
 aws_access_key_id = test
 aws_secret_access_key = test
 ```
@@ -164,6 +166,20 @@ Both URL styles are supported:
 
 Features: multipart upload, presigned GET/PUT URLs, object versioning, object metadata (Content-Type, ETag, user metadata).
 
+## DynamoDB-specific notes
+
+All requests POST to `http://localhost:4566/dynamodb/` with the `X-Amz-Target` header, which is exactly what the AWS SDK sends when you configure a custom endpoint.
+
+**Supported operations:** CreateTable, DeleteTable, DescribeTable, ListTables, UpdateTable, PutItem, GetItem, DeleteItem, UpdateItem, BatchGetItem, BatchWriteItem, TransactGetItems, TransactWriteItems, Query, Scan, UpdateTimeToLive, DescribeTimeToLive, ListStreams, DescribeStream, GetShardIterator, GetRecords.
+
+**Expressions:** FilterExpression, ConditionExpression, KeyConditionExpression, UpdateExpression (SET/REMOVE/ADD/DELETE), and ProjectionExpression are all supported. Expression attribute names (`#name`) and values (`:val`) are substituted correctly.
+
+**Streams:** Enable with `StreamSpecification: {StreamEnabled: true, StreamViewType: NEW_AND_OLD_IMAGES}` at table creation or via UpdateTable. Records are available via the standard Streams API (GetShardIterator / GetRecords). Each table has a single shard.
+
+**TTL:** Enable per-table with UpdateTimeToLive. Items whose TTL attribute (an N-type Unix timestamp) has elapsed are automatically deleted by a background sweep that runs every `dynamodb.ttl_sweep_interval` seconds (default: 60).
+
+**Not supported:** GSI and LSI (deferred).
+
 ## RDS proxy
 
 When the RDS proxy is enabled, Cloudish accepts Postgres wire-protocol connections on `rds.proxy_port` (default: `5433`) and forwards them to the database at `rds.proxy_dsn`. The management-plane API (CreateDBInstance, etc.) returns `NotImplemented`.
@@ -189,10 +205,10 @@ docker run -d \
   cloudish:latest
 ```
 
-| Port | Purpose |
-|------|---------|
-| 4566 | AWS HTTP API |
-| 5433 | RDS Postgres proxy |
+| Port | Purpose                |
+|------|------------------------|
+| 4566 | AWS HTTP API           |
+| 5433 | RDS Postgres proxy     |
 
 The container starts its own PostgreSQL instance and waits for it to be ready before starting Cloudish. Data is persisted to the `/data` volume.
 
@@ -210,14 +226,18 @@ docker run -d \
 Integration tests start an isolated Cloudish server on a random port and clean up after themselves.
 
 ```bash
-# Run all S3 integration tests
+# Run all integration tests
+cargo test
+
+# Run tests for a specific service
 cargo test --test s3
+cargo test --test dynamodb
 
 # Show log output
-cargo test --test s3 -- --nocapture
+cargo test --test dynamodb -- --nocapture
 
 # Run a specific test
-cargo test --test s3 test_name -- --nocapture
+cargo test --test dynamodb test_streams -- --nocapture
 ```
 
 Test data is written to `data/test_{port}/` and wiped at the start of each run, so it never interferes with your local `data/` directory.
