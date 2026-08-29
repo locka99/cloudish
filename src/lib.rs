@@ -11,7 +11,7 @@ pub use services::AppState;
 
 pub async fn build_app(state: Arc<AppState>) -> anyhow::Result<Router> {
     let app = Router::new()
-        .merge(services::router())
+        .merge(services::router(state.clone()))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::middleware,

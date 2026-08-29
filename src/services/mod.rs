@@ -63,10 +63,10 @@ impl AppState {
 }
 
 /// Builds the combined router for all services.
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         .merge(s3::router())
-        .merge(dynamodb::router())
+        .merge(dynamodb::router(state))
         .merge(cognito::router())
         .merge(appconfig::router())
         .merge(rds::router())
