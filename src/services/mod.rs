@@ -46,6 +46,20 @@ impl AppState {
                 .unwrap_or_else(|_| "postgresql://localhost/cloudish".into()),
         })
     }
+
+    pub async fn new_with_config(config: &crate::config::Config) -> Result<Self> {
+        let base = &config.storage.data_dir;
+        Ok(Self {
+            s3: Arc::new(FileStorage::new(base.join("s3")).await?),
+            dynamodb: Arc::new(FileStorage::new(base.join("dynamodb")).await?),
+            cognito: Arc::new(FileStorage::new(base.join("cognito")).await?),
+            appconfig: Arc::new(FileStorage::new(base.join("appconfig")).await?),
+            ses: Arc::new(FileStorage::new(base.join("ses")).await?),
+            sqs: Arc::new(FileStorage::new(base.join("sqs")).await?),
+            iam: Arc::new(FileStorage::new(base.join("iam")).await?),
+            rds_dsn: config.rds.proxy_dsn.clone(),
+        })
+    }
 }
 
 /// Builds the combined router for all services.

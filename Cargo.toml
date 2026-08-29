@@ -23,6 +23,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
 anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde_yaml = "0.9"
 hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"

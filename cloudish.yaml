@@ -1,7 +1,7 @@
 # cloudish configuration
 #
 # Loaded from ./cloudish.yaml first, then ~/.cloudish/config.yaml as a fallback.
-# Command-line flags (when implemented) take precedence over this file.
+# Override with: cloudish --config path/to/cloudish.yaml
 
 # ── Server ────────────────────────────────────────────────────────────────────
 
