@@ -40,11 +40,18 @@ use crate::services::dynamodb::types::{AttributeValue, Item, TableMeta};
 pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     // Spawn TTL sweep task
     tokio::spawn(ttl_sweep_task(state));
-    // AWS SDK sends DynamoDB requests as POST / with X-Amz-Target header.
-    // Also keep /dynamodb/ for direct HTTP testing.
+    // Keep /dynamodb/ for direct HTTP testing.
+    // The top-level POST / dispatcher in services/mod.rs routes SDK traffic here.
     Router::new()
-        .route("/", post(dispatch))
-        .route("/dynamodb/", post(dispatch))
+        .route("/dynamodb/", post(dispatch_inner))
+}
+
+/// Public dispatch function called from the top-level POST / handler.
+pub(crate) async fn dispatch(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+) -> impl IntoResponse {
+    dispatch_inner(State(state), request).await
 }
 
 // ── Error helpers ─────────────────────────────────────────────────────────────
@@ -79,7 +86,7 @@ fn internal_error(msg: &str) -> (StatusCode, axum::Json<Value>) {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
-async fn dispatch(
+async fn dispatch_inner(
     State(state): State<Arc<AppState>>,
     request: Request,
 ) -> impl IntoResponse {

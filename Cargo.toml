@@ -33,11 +33,16 @@ base64 = "0.22"
 tokio-postgres = "0.7"
 quick-xml = { version = "0.37", features = ["serialize"] }
 md-5 = "0.10"
+jsonwebtoken = "9"
+rsa = { version = "0.9", features = ["pem"] }
+rand = "0.8"
+bcrypt = "0.15"
 
 [dev-dependencies]
 tokio-test = "0.4"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-sdk-dynamodb = "1"
+aws-sdk-cognitoidentityprovider = "1"
 reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }

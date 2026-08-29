@@ -8,7 +8,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 |---------|--------|
 | S3 | Implemented |
 | DynamoDB | Implemented |
-| Cognito | Stub |
+| Cognito | Implemented |
 | AppConfig | Stub |
 | RDS | Proxy (Postgres wire protocol) |
 | SES | Stub |
@@ -19,7 +19,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 ## Requirements
 
 - Rust 1.81+ (for building from source)
-- PostgreSQL 12+ (only required if using the RDS proxy feature)
+- PostgreSQL 12+ (only required if using timplehe RDS proxy feature)
 
 ## Building
 
@@ -180,6 +180,20 @@ All requests POST to `http://localhost:4566/dynamodb/` with the `X-Amz-Target` h
 
 **Not supported:** GSI and LSI (deferred).
 
+## Cognito-specific notes
+
+All requests POST to `http://localhost:4566/` with the `X-Amz-Target` header (e.g. `AmazonCognitoIdentityProvider.InitiateAuth`), which is exactly what the AWS SDK sends.
+
+**Supported operations:** CreateUserPool, DeleteUserPool, DescribeUserPool, ListUserPools, CreateUserPoolClient, DeleteUserPoolClient, DescribeUserPoolClient, ListUserPoolClients, AdminCreateUser, AdminDeleteUser, AdminGetUser, AdminSetUserPassword, AdminUpdateUserAttributes, ListUsers, AdminInitiateAuth, InitiateAuth, AdminRespondToAuthChallenge, RespondToAuthChallenge, SignUp, ConfirmSignUp, GetUser.
+
+**Auth flows:** `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH`. SRP is not supported.
+
+**Tokens:** Real RS256-signed JWTs. An RSA-2048 keypair is generated on first run and persisted under `data/cognito/`. Access tokens expire after 1 hour; refresh tokens after 30 days (configured via `cognito.access_token_ttl` / `cognito.refresh_token_ttl`).
+
+**JWKS:** The public key is served at `GET /cognito/{pool_id}/.well-known/jwks.json` so token verification libraries can fetch it.
+
+**Not supported:** MFA, SRP auth, advanced security features.
+
 ## RDS proxy
 
 When the RDS proxy is enabled, Cloudish accepts Postgres wire-protocol connections on `rds.proxy_port` (default: `5433`) and forwards them to the database at `rds.proxy_dsn`. The management-plane API (CreateDBInstance, etc.) returns `NotImplemented`.
@@ -232,9 +246,10 @@ cargo test
 # Run tests for a specific service
 cargo test --test s3
 cargo test --test dynamodb
+cargo test --test cognito
 
 # Show log output
-cargo test --test dynamodb -- --nocapture
+cargo test --test cognito -- --nocapture
 
 # Run a specific test
 cargo test --test dynamodb test_streams -- --nocapture

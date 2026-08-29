@@ -10,7 +10,13 @@ pub mod sqs;
 use std::sync::Arc;
 
 use anyhow::Result;
-use axum::Router;
+use axum::{
+    Router,
+    extract::{Request, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::post,
+};
 
 use crate::storage::file::FileStorage;
 
@@ -62,9 +68,37 @@ impl AppState {
     }
 }
 
+/// Top-level POST / dispatcher: routes by X-Amz-Target to the right service.
+async fn top_level_dispatch(
+    state: State<Arc<AppState>>,
+    request: Request,
+) -> impl IntoResponse {
+    let target = request
+        .headers()
+        .get("x-amz-target")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    if target.starts_with("DynamoDB_") || target.starts_with("DynamoDBStreams_") {
+        dynamodb::dispatch(state, request).await.into_response()
+    } else if target.starts_with("AmazonCognitoIdentityProvider.")
+        || target.starts_with("AWSCognitoIdentityProviderService.")
+    {
+        cognito::dispatch(state, request).await.into_response()
+    } else {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("unknown target: {target}"),
+        )
+            .into_response()
+    }
+}
+
 /// Builds the combined router for all services.
 pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
+        .route("/", post(top_level_dispatch))
         .merge(s3::router())
         .merge(dynamodb::router(state))
         .merge(cognito::router())
