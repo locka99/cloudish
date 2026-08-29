@@ -12,7 +12,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | AppConfig | Stub |
 | RDS | Proxy (Postgres wire protocol) |
 | SES | Stub |
-| SQS | Stub |
+| SQS | Implemented |
 | IAM | Implemented |
 | CloudWatch | Not started |
 
@@ -194,6 +194,20 @@ All requests POST to `http://localhost:4566/` with the `X-Amz-Target` header (e.
 
 **Not supported:** MFA, SRP auth, advanced security features.
 
+## SQS-specific notes
+
+SQS uses the AWS JSON protocol (`application/x-amz-json-1.0`) with an `X-Amz-Target` header (e.g. `AmazonSQS.SendMessage`), unlike IAM which uses form-encoded/XML.
+
+Queue URLs follow the pattern `http://localhost:4566/000000000000/{queue_name}`. Queue-specific operations (SendMessage, ReceiveMessage, etc.) are sent by the SDK directly to the queue URL path; service-level operations (CreateQueue, ListQueues, GetQueueUrl) go to `POST /`.
+
+**Supported operations:** CreateQueue, DeleteQueue, GetQueueUrl, ListQueues, ListDeadLetterSourceQueues, GetQueueAttributes, SetQueueAttributes, SendMessage, SendMessageBatch, ReceiveMessage, DeleteMessage, DeleteMessageBatch, ChangeMessageVisibility, ChangeMessageVisibilityBatch, PurgeQueue.
+
+**FIFO queues:** Create with a `.fifo` name suffix and set `FifoQueue=true`. Supports `MessageGroupId` (ordering) and `MessageDeduplicationId` (5-minute dedup window). Also supports `ContentBasedDeduplication`.
+
+**Dead-letter queues:** Set `RedrivePolicy` with `deadLetterTargetArn` and `maxReceiveCount` on the source queue. Messages exceeding the receive count are automatically moved to the DLQ during `ReceiveMessage`.
+
+**Long polling:** `ReceiveMessage` with `WaitTimeSeconds > 0` holds the connection open until a message arrives or the timeout expires (max 20 s, configurable via `sqs.max_wait_time`). Uses `tokio::sync::Notify` for efficient wakeup rather than busy-polling.
+
 ## IAM-specific notes
 
 IAM uses a different wire format from the JSON-based services. Requests are `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateUser&UserName=alice`). Responses are XML.
@@ -201,7 +215,7 @@ IAM uses a different wire format from the JSON-based services. Requests are `POS
 **Supported operations:**
 
 | Category | Operations |
-|----------|-----------|
+|----------|------------|
 | Users | CreateUser, DeleteUser, GetUser, UpdateUser, ListUsers, TagUser, UntagUser, ListUserTags |
 | Access keys | CreateAccessKey, DeleteAccessKey, ListAccessKeys, UpdateAccessKey |
 | Inline policies | PutUserPolicy, GetUserPolicy, DeleteUserPolicy, ListUserPolicies, PutRolePolicy, GetRolePolicy, DeleteRolePolicy, ListRolePolicies |
@@ -266,6 +280,7 @@ cargo test --test s3
 cargo test --test dynamodb
 cargo test --test cognito
 cargo test --test iam
+cargo test --test sqs
 
 # Show log output
 cargo test --test cognito -- --nocapture
