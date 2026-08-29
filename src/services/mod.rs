@@ -87,11 +87,21 @@ async fn top_level_dispatch(
     {
         cognito::dispatch(state, request).await.into_response()
     } else {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("unknown target: {target}"),
-        )
-            .into_response()
+        // Route by service from SigV4 credential scope
+        let service = request
+            .extensions()
+            .get::<crate::auth::Credentials>()
+            .map(|c| c.service.clone())
+            .unwrap_or_default();
+
+        match service.as_str() {
+            "iam" | "sts" => iam::dispatch(State(state.0.clone()), request).await.into_response(),
+            _ => (
+                StatusCode::BAD_REQUEST,
+                format!("unknown target: {target}"),
+            )
+                .into_response(),
+        }
     }
 }
 

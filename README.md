@@ -13,7 +13,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | RDS | Proxy (Postgres wire protocol) |
 | SES | Stub |
 | SQS | Stub |
-| IAM | Stub |
+| IAM | Implemented |
 | CloudWatch | Not started |
 
 ## Requirements
@@ -194,6 +194,24 @@ All requests POST to `http://localhost:4566/` with the `X-Amz-Target` header (e.
 
 **Not supported:** MFA, SRP auth, advanced security features.
 
+## IAM-specific notes
+
+IAM uses a different wire format from the JSON-based services. Requests are `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateUser&UserName=alice`). Responses are XML.
+
+**Supported operations:**
+
+| Category | Operations |
+|----------|-----------|
+| Users | CreateUser, DeleteUser, GetUser, UpdateUser, ListUsers, TagUser, UntagUser, ListUserTags |
+| Access keys | CreateAccessKey, DeleteAccessKey, ListAccessKeys, UpdateAccessKey |
+| Inline policies | PutUserPolicy, GetUserPolicy, DeleteUserPolicy, ListUserPolicies, PutRolePolicy, GetRolePolicy, DeleteRolePolicy, ListRolePolicies |
+| Managed policies | CreatePolicy, DeletePolicy, GetPolicy, ListPolicies, GetPolicyVersion |
+| Attach/detach | AttachUserPolicy, DetachUserPolicy, ListAttachedUserPolicies, AttachRolePolicy, DetachRolePolicy, ListAttachedRolePolicies |
+| Roles | CreateRole, DeleteRole, GetRole, ListRoles, TagRole, UntagRole, ListRoleTags |
+| STS | GetCallerIdentity |
+
+**STS:** `GetCallerIdentity` is handled by the IAM dispatcher (same form-encoded XML format). The SigV4 credential scope `service=sts` routes it automatically when using the AWS SDK with a custom endpoint.
+
 ## RDS proxy
 
 When the RDS proxy is enabled, Cloudish accepts Postgres wire-protocol connections on `rds.proxy_port` (default: `5433`) and forwards them to the database at `rds.proxy_dsn`. The management-plane API (CreateDBInstance, etc.) returns `NotImplemented`.
@@ -247,6 +265,7 @@ cargo test
 cargo test --test s3
 cargo test --test dynamodb
 cargo test --test cognito
+cargo test --test iam
 
 # Show log output
 cargo test --test cognito -- --nocapture

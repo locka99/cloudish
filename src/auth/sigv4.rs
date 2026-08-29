@@ -16,10 +16,21 @@ pub fn extract_credentials(headers: &HeaderMap) -> anyhow::Result<Option<Credent
     }
 
     // Parse Credential= component.
+    // The Authorization header format is:
+    // AWS4-HMAC-SHA256 Credential=KEY/date/region/service/aws4_request, SignedHeaders=..., Signature=...
+    // The first segment is "AWS4-HMAC-SHA256 Credential=..." so we need to find "Credential=" anywhere.
     let credential = auth
         .split(',')
-        .find(|part| part.trim_start().starts_with("Credential="))
-        .and_then(|part| part.trim_start().strip_prefix("Credential="))
+        .find_map(|part| {
+            let trimmed = part.trim();
+            // Strip the algorithm prefix if present (first component)
+            let after_algo = if let Some(idx) = trimmed.find("Credential=") {
+                &trimmed[idx..]
+            } else {
+                trimmed
+            };
+            after_algo.strip_prefix("Credential=")
+        })
         .ok_or_else(|| anyhow::anyhow!("missing Credential in Authorization header"))?
         .trim();
 
