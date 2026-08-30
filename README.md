@@ -21,7 +21,8 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 ## Requirements
 
 - Rust 1.81+ (for building from source)
-- PostgreSQL 12+ (only required if using timplehe RDS proxy feature)
+- PostgreSQL 12+ (only required if using the RDS proxy feature)
+- Docker (only required if using the Lambda executor)
 
 ## Building
 
@@ -80,6 +81,11 @@ sqs:
 cognito:
   access_token_ttl: 3600       # 1 hour (seconds)
   refresh_token_ttl: 2592000   # 30 days (seconds)
+
+lambda:
+  executor: "docker"           # docker (default) or subprocess
+  network: "bridge"            # Docker network for function containers
+  default_timeout: 30          # Function timeout in seconds
 
 logging:
   level: "info"                # error | warn | info | debug | trace
@@ -277,6 +283,15 @@ All operations currently return `501 Not Implemented`.
 
 Lambda uses a REST/JSON API over paths rooted at `/2015-03-31/`. The SigV4 credential scope `service=lambda` identifies requests.
 
+**Current status:** stub — all endpoints are routed correctly but return `501 Not Implemented`.
+
+**Planned execution model:** Docker-based. On `Invoke`, Cloudish will run the function inside an official AWS Lambda base image (`amazon/aws-lambda-<runtime>`) using the Lambda Runtime Interface Emulator (RIE). The event JSON is POSTed to the container's local RIE endpoint and the response is returned to the caller. Function code (zip or image reference) is stored under `data/lambda/functions/{name}/`.
+
+**Planned trigger model:** Event source mappings (SQS, DynamoDB Streams) will spawn a per-mapping background tokio task that polls the source and invokes the function:
+
+- **SQS** — `ReceiveMessage` up to `BatchSize`; on success delete the batch; on failure leave messages to expire/retry or move to DLQ if `maxReceiveCount` is exceeded.
+- **DynamoDB Streams** — `GetShardIterator` + `GetRecords` in a loop; deliver records as a `{"Records": [...]}` event.
+
 **Stubbed endpoints:**
 
 | Method | Path | Operation |
@@ -298,8 +313,6 @@ Lambda uses a REST/JSON API over paths rooted at `/2015-03-31/`. The SigV4 crede
 | GET | `/2015-03-31/layers` | ListLayers |
 | GET/POST | `/2015-03-31/layers/{name}/versions` | ListLayerVersions / PublishLayerVersion |
 | GET/DELETE | `/2015-03-31/layers/{name}/versions/{version}` | GetLayerVersion / DeleteLayerVersion |
-
-All operations currently return `501 Not Implemented`.
 
 ## RDS proxy
 
