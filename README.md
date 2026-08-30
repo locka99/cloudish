@@ -14,7 +14,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | SES | Implemented |
 | SQS | Implemented |
 | IAM | Implemented |
-| SNS | Stub |
+| SNS | Implemented |
 | Lambda | Stub |
 | CloudWatch | Not started |
 
@@ -275,9 +275,31 @@ AppConfig uses a REST/JSON API (no `X-Amz-Target` header). The management plane 
 
 SNS uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateTopic&Name=my-topic`). The SigV4 credential scope `service=sns` routes it automatically when using the AWS SDK with a custom endpoint.
 
-**Stubbed operations:** CreateTopic, DeleteTopic, ListTopics, GetTopicAttributes, SetTopicAttributes, Subscribe, Unsubscribe, ListSubscriptions, ListSubscriptionsByTopic, GetSubscriptionAttributes, SetSubscriptionAttributes, ConfirmSubscription, Publish, PublishBatch, CreatePlatformApplication, DeletePlatformApplication, ListPlatformApplications, TagResource, UntagResource, ListTagsForResource.
+**Supported operations:**
 
-All operations currently return `501 Not Implemented`.
+| Operation | Notes |
+|-----------|-------|
+| CreateTopic | Idempotent — returns same ARN for duplicate names |
+| DeleteTopic | Removes topic and all its subscriptions |
+| ListTopics | Paginated (NextToken supported) |
+| GetTopicAttributes | Returns TopicArn, DisplayName, SubscriptionsConfirmed, etc. |
+| SetTopicAttributes | DisplayName, DeliveryPolicy |
+| Subscribe | Protocols: `sqs`, `http`, `https`, `email`, `email-json`. Auto-confirmed. Attributes (RawMessageDelivery, FilterPolicy) accepted at subscribe time |
+| Unsubscribe | |
+| ConfirmSubscription | No-op (subscriptions are auto-confirmed) |
+| ListSubscriptions | |
+| ListSubscriptionsByTopic | |
+| GetSubscriptionAttributes | |
+| SetSubscriptionAttributes | RawMessageDelivery, FilterPolicy |
+| Publish | Delivers to all confirmed subscriptions |
+| PublishBatch | Up to 10 messages per batch |
+| TagResource / UntagResource / ListTagsForResource | |
+| CreatePlatformApplication / DeletePlatformApplication / ListPlatformApplications | Stub (returns empty list) |
+
+**Delivery:**
+- **SQS** — enqueued directly into the target queue (no HTTP round-trip). Wrapped in SNS JSON envelope unless `RawMessageDelivery=true`.
+- **HTTP/HTTPS** — fire-and-forget POST to the endpoint URL. Failures are logged but not retried.
+- **email / email-json** — logged only; no real email is sent.
 
 ## Lambda-specific notes
 
@@ -371,6 +393,7 @@ cargo test --test iam
 cargo test --test sqs
 cargo test --test ses
 cargo test --test appconfig
+cargo test --test sns
 
 # Show log output
 cargo test --test cognito -- --nocapture

@@ -69,7 +69,7 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 
 22. **Cognito MFA** — not supported.
 
-23. **SNS wire format** — Query protocol (`POST /` with URL-encoded body and `Action=` parameter). Routed via SigV4 credential scope `service=sns`. Currently a stub; all operations return `NotImplemented`.
+23. **SNS wire format** — Query protocol (`POST /` with URL-encoded body and `Action=` parameter). Routed via SigV4 credential scope `service=sns`. Fully implemented. Subscriptions are auto-confirmed. SQS delivery is done via internal `sqs::enqueue_to_queue` (not HTTP). HTTP/HTTPS delivery is fire-and-forget (tokio::spawn + reqwest). Email delivery is log-only. Platform apps are stubbed as empty lists. Subscribe accepts `Attributes.entry.N.key/value` pairs (e.g. `RawMessageDelivery=true`).
 
 24. **Lambda wire format** — REST/JSON under `/2015-03-31/`. Routed by path. Currently a stub; all operations return `NotImplemented`. Planned execution model: Docker via the AWS Lambda Runtime Interface Emulator (RIE) — POST event JSON to the container's local RIE endpoint and return the response. Event source mappings (SQS, DynamoDB Streams) will drive a per-mapping background tokio task that polls the source and calls Invoke. On SQS success delete the batch; on failure leave messages to retry/DLQ. On DynamoDB Streams advance the shard iterator.
 

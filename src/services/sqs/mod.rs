@@ -194,6 +194,49 @@ fn receipt_index_path(queue_name: &str, receipt_handle: &str) -> String {
     format!("queues/{queue_name}/receipts/{receipt_handle}")
 }
 
+// ── Public helper for internal use (e.g. SNS delivery) ──────────────────────
+
+/// Enqueue a plain-text message to a queue by name.
+/// Returns the message ID on success, or an error string on failure.
+/// Used by the SNS service to deliver to SQS subscriptions.
+pub async fn enqueue_to_queue(state: &Arc<AppState>, queue_name: &str, body: &str) -> Result<String, String> {
+    let meta = match load_meta(&state.sqs, queue_name).await {
+        Ok(Some(m)) => m,
+        Ok(None) => return Err(format!("queue not found: {queue_name}")),
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let now = now_secs();
+    let delay_until = if meta.delay_seconds > 0 { now + meta.delay_seconds } else { 0 };
+    let message_id = new_message_id();
+    let receipt_handle = new_receipt_handle();
+
+    let mut attributes = HashMap::new();
+    attributes.insert("SenderId".into(), "000000000000".into());
+    attributes.insert("SentTimestamp".into(), (now * 1000).to_string());
+    attributes.insert("ApproximateReceiveCount".into(), "0".into());
+
+    let msg = StoredMessage {
+        message_id: message_id.clone(),
+        receipt_handle,
+        body: body.to_string(),
+        md5_of_body: md5_hex(body),
+        attributes,
+        message_attributes: HashMap::new(),
+        sent_at: now,
+        delay_until,
+        visible_after: 0,
+        receive_count: 0,
+        group_id: None,
+        deduplication_id: None,
+        sequence_number: None,
+    };
+
+    save_message(&state.sqs, queue_name, &msg).await.map_err(|e| e.to_string())?;
+    get_or_create_notify(queue_name).notify_waiters();
+    Ok(message_id)
+}
+
 // ── Storage helpers ──────────────────────────────────────────────────────────
 
 async fn load_meta(
