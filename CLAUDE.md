@@ -8,6 +8,8 @@ This project shall emulate the APIs for following AWS services
 - SES
 - SQS
 - IAM (basics)
+- SNS
+- Lambda
 - CloudWatch
 
 For each of these the APIs will be backed by persistent storage that will hold data under a subdirectory of `data/`
@@ -64,6 +66,10 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 21. **Cognito auth flows** — `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` only. SRP not supported.
 
 22. **Cognito MFA** — not supported.
+
+23. **SNS wire format** — Query protocol (`POST /` with URL-encoded body and `Action=` parameter). Routed via SigV4 credential scope `service=sns`. Currently a stub; all operations return `NotImplemented`.
+
+24. **Lambda wire format** — REST/JSON under `/2015-03-31/`. Routed by path. Currently a stub; all operations return `NotImplemented`.
 
 ## Testing Rules
 

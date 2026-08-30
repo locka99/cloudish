@@ -2,9 +2,11 @@ pub mod appconfig;
 pub mod cognito;
 pub mod dynamodb;
 pub mod iam;
+pub mod lambda;
 pub mod rds;
 pub mod s3;
 pub mod ses;
+pub mod sns;
 pub mod sqs;
 
 use std::sync::Arc;
@@ -29,6 +31,8 @@ pub struct AppState {
     pub ses: Arc<FileStorage>,
     pub sqs: Arc<FileStorage>,
     pub iam: Arc<FileStorage>,
+    pub sns: Arc<FileStorage>,
+    pub lambda: Arc<FileStorage>,
     // RDS is backed by a real Postgres connection — config held separately.
     pub rds_dsn: String,
 }
@@ -48,6 +52,8 @@ impl AppState {
             ses: Arc::new(FileStorage::new(base.join("ses")).await?),
             sqs: Arc::new(FileStorage::new(base.join("sqs")).await?),
             iam: Arc::new(FileStorage::new(base.join("iam")).await?),
+            sns: Arc::new(FileStorage::new(base.join("sns")).await?),
+            lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             rds_dsn: std::env::var("RDS_DSN")
                 .unwrap_or_else(|_| "postgresql://localhost/cloudish".into()),
         })
@@ -63,6 +69,8 @@ impl AppState {
             ses: Arc::new(FileStorage::new(base.join("ses")).await?),
             sqs: Arc::new(FileStorage::new(base.join("sqs")).await?),
             iam: Arc::new(FileStorage::new(base.join("iam")).await?),
+            sns: Arc::new(FileStorage::new(base.join("sns")).await?),
+            lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             rds_dsn: config.rds.proxy_dsn.clone(),
         })
     }
@@ -97,6 +105,7 @@ async fn top_level_dispatch(
         match service.as_str() {
             "iam" | "sts" => iam::dispatch(State(state.0.clone()), request).await.into_response(),
             "sqs" => sqs::service_dispatch(State(state.0.clone()), request).await.into_response(),
+            "sns" => sns::dispatch(State(state.0.clone()), request).await.into_response(),
             _ => (
                 StatusCode::BAD_REQUEST,
                 format!("unknown target: {target}"),
@@ -118,4 +127,6 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .merge(ses::router())
         .merge(sqs::router())
         .merge(iam::router())
+        .merge(sns::router())
+        .merge(lambda::router())
 }

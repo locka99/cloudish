@@ -14,6 +14,8 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | SES | Stub |
 | SQS | Implemented |
 | IAM | Implemented |
+| SNS | Stub |
+| Lambda | Stub |
 | CloudWatch | Not started |
 
 ## Requirements
@@ -152,7 +154,9 @@ data/
 ├── appconfig/   # Application configurations
 ├── ses/sent/    # Sent emails as JSON
 ├── sqs/         # Queues and messages
-└── iam/         # IAM data
+├── iam/         # IAM data
+├── sns/         # Topics and subscriptions
+└── lambda/      # Functions and event source mappings
 ```
 
 Delete the `data/` directory to reset all state.
@@ -225,6 +229,42 @@ IAM uses a different wire format from the JSON-based services. Requests are `POS
 | STS | GetCallerIdentity |
 
 **STS:** `GetCallerIdentity` is handled by the IAM dispatcher (same form-encoded XML format). The SigV4 credential scope `service=sts` routes it automatically when using the AWS SDK with a custom endpoint.
+
+## SNS-specific notes
+
+SNS uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateTopic&Name=my-topic`). The SigV4 credential scope `service=sns` routes it automatically when using the AWS SDK with a custom endpoint.
+
+**Stubbed operations:** CreateTopic, DeleteTopic, ListTopics, GetTopicAttributes, SetTopicAttributes, Subscribe, Unsubscribe, ListSubscriptions, ListSubscriptionsByTopic, GetSubscriptionAttributes, SetSubscriptionAttributes, ConfirmSubscription, Publish, PublishBatch, CreatePlatformApplication, DeletePlatformApplication, ListPlatformApplications, TagResource, UntagResource, ListTagsForResource.
+
+All operations currently return `501 Not Implemented`.
+
+## Lambda-specific notes
+
+Lambda uses a REST/JSON API over paths rooted at `/2015-03-31/`. The SigV4 credential scope `service=lambda` identifies requests.
+
+**Stubbed endpoints:**
+
+| Method | Path | Operation |
+|--------|------|-----------|
+| POST | `/2015-03-31/functions` | CreateFunction |
+| GET | `/2015-03-31/functions` | ListFunctions |
+| GET | `/2015-03-31/functions/{name}` | GetFunction |
+| DELETE | `/2015-03-31/functions/{name}` | DeleteFunction |
+| PUT | `/2015-03-31/functions/{name}/code` | UpdateFunctionCode |
+| GET | `/2015-03-31/functions/{name}/configuration` | GetFunctionConfiguration |
+| PUT | `/2015-03-31/functions/{name}/configuration` | UpdateFunctionConfiguration |
+| POST | `/2015-03-31/functions/{name}/invocations` | Invoke |
+| GET/POST | `/2015-03-31/functions/{name}/aliases` | ListAliases / CreateAlias |
+| GET/PUT/DELETE | `/2015-03-31/functions/{name}/aliases/{alias}` | GetAlias / UpdateAlias / DeleteAlias |
+| GET/POST | `/2015-03-31/functions/{name}/policy` | GetPolicy / AddPermission |
+| DELETE | `/2015-03-31/functions/{name}/policy/{sid}` | RemovePermission |
+| GET/POST | `/2015-03-31/event-source-mappings` | ListEventSourceMappings / CreateEventSourceMapping |
+| GET/PUT/DELETE | `/2015-03-31/event-source-mappings/{uuid}` | GetEventSourceMapping / UpdateEventSourceMapping / DeleteEventSourceMapping |
+| GET | `/2015-03-31/layers` | ListLayers |
+| GET/POST | `/2015-03-31/layers/{name}/versions` | ListLayerVersions / PublishLayerVersion |
+| GET/DELETE | `/2015-03-31/layers/{name}/versions/{version}` | GetLayerVersion / DeleteLayerVersion |
+
+All operations currently return `501 Not Implemented`.
 
 ## RDS proxy
 
