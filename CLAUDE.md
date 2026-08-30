@@ -59,9 +59,11 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 
 18. **SQS long polling** — supported; `ReceiveMessage` holds the connection open until a message arrives or the wait timeout expires.
 
-19. **SES sent mail storage** — sent emails saved to `data/ses/sent/` as JSON (headers + body).
+19. **SES sent mail storage** — sent emails saved to `data/ses/sent/{message_id}.json` as JSON (source, destinations, subject, body, timestamp). `SendRawEmail` stores the base64-encoded MIME payload as-is.
 
 20. **SES SMTP interface** — not supported; HTTP API only.
+
+20a. **SES wire format** — Query protocol (`POST /` with URL-encoded body and `Action=` param). SigV4 credential scope `service=ses`. Identities are auto-verified (no email challenge). Supported: SendEmail, SendRawEmail, VerifyEmailIdentity, ListIdentities, GetIdentityVerificationAttributes, DeleteIdentity, GetSendQuota, GetSendStatistics.
 
 21. **Cognito auth flows** — `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` only. SRP not supported.
 

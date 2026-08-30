@@ -11,7 +11,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | Cognito | Implemented |
 | AppConfig | Stub |
 | RDS | Proxy (Postgres wire protocol) |
-| SES | Stub |
+| SES | Implemented |
 | SQS | Implemented |
 | IAM | Implemented |
 | SNS | Stub |
@@ -230,6 +230,18 @@ IAM uses a different wire format from the JSON-based services. Requests are `POS
 
 **STS:** `GetCallerIdentity` is handled by the IAM dispatcher (same form-encoded XML format). The SigV4 credential scope `service=sts` routes it automatically when using the AWS SDK with a custom endpoint.
 
+## SES-specific notes
+
+SES uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body. The SigV4 credential scope `service=ses` routes it automatically when using the AWS SDK with a custom endpoint.
+
+**Supported operations:** SendEmail, SendRawEmail, VerifyEmailIdentity, ListIdentities, GetIdentityVerificationAttributes, DeleteIdentity, GetSendQuota, GetSendStatistics.
+
+**Identity verification:** All identities (email addresses and domains) are immediately marked as verified — there is no real email challenge.
+
+**Sent mail storage:** Every sent email is saved as a JSON file under `data/ses/sent/{message_id}.json` containing the source, destinations, subject, body, and timestamp. For `SendRawEmail`, the base64-encoded MIME payload is stored as-is.
+
+**Quota:** `GetSendQuota` returns static values (50 000 messages/day, 14 messages/second).
+
 ## SNS-specific notes
 
 SNS uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateTopic&Name=my-topic`). The SigV4 credential scope `service=sns` routes it automatically when using the AWS SDK with a custom endpoint.
@@ -321,6 +333,7 @@ cargo test --test dynamodb
 cargo test --test cognito
 cargo test --test iam
 cargo test --test sqs
+cargo test --test ses
 
 # Show log output
 cargo test --test cognito -- --nocapture
