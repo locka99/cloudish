@@ -1,6 +1,9 @@
 # Cloudish
 
-A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for common AWS services on a single port, making it easy to develop and test AWS-backed applications without a real AWS account.
+Welcome to Cloudish. This is a mostly AI generated emulation of AWS services written in Rust. It would be
+similar in purpose to LocalStack but open sourced under MIT license.
+
+It provides HTTP API-compatible endpoints for common AWS services on a single port, making it easy to develop and test AWS-backed applications without a real AWS account.
 
 ## Services
 
@@ -175,6 +178,68 @@ Both URL styles are supported:
 - Virtual-hosted-style: `http://bucket-name.localhost:4566/object-key`
 
 Features: multipart upload, presigned GET/PUT URLs, object versioning, object metadata (Content-Type, ETag, user metadata).
+
+### Example usage (AWS CLI)
+
+First, configure a named profile so you don't have to repeat flags on every command:
+
+```bash
+aws configure --profile cloudish
+# AWS Access Key ID:     test
+# AWS Secret Access Key: test
+# Default region name:   eu-west-1
+# Default output format: json
+```
+
+Or set the profile's endpoint URL directly in `~/.aws/config`:
+
+```ini
+[profile cloudish]
+aws_access_key_id = test
+aws_secret_access_key = test
+region = eu-west-1
+endpoint_url = http://localhost:4566
+```
+
+Then use the `--profile cloudish` flag (or set `AWS_PROFILE=cloudish` in your shell):
+
+```bash
+export AWS_PROFILE=cloudish
+
+# Create a bucket
+aws s3 mb s3://my-bucket
+
+# Upload a file
+aws s3 cp ./hello.txt s3://my-bucket/hello.txt
+
+# List objects in a bucket
+aws s3 ls s3://my-bucket
+
+# Download a file
+aws s3 cp s3://my-bucket/hello.txt ./hello-downloaded.txt
+
+# Sync a local directory to a bucket
+aws s3 sync ./my-dir s3://my-bucket/my-dir/
+
+# Generate a presigned GET URL (valid for 1 hour)
+aws s3 presign s3://my-bucket/hello.txt --expires-in 3600
+
+# Delete an object
+aws s3 rm s3://my-bucket/hello.txt
+
+# Delete a bucket and all its contents
+aws s3 rb s3://my-bucket --force
+```
+
+If you prefer environment variables over a named profile:
+
+```bash
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export AWS_DEFAULT_REGION=eu-west-1
+
+aws --endpoint-url http://localhost:4566 s3 ls
+```
 
 ## DynamoDB-specific notes
 
