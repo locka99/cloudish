@@ -18,7 +18,7 @@ It provides HTTP API-compatible endpoints for common AWS services on a single po
 | SQS | Implemented |
 | IAM | Implemented |
 | SNS | Implemented |
-| Lambda | Stub |
+| Lambda | Implemented |
 | CloudWatch | Not started |
 
 ## Requirements
@@ -216,8 +216,7 @@ aws s3 cp ./hello.txt s3://my-bucket/hello.txt
 aws s3 ls s3://my-bucket
 
 # Download a file
-aws s3 cp s3://my-bucket/hello.txt ./hello-downloaded.txt
-
+aws s3 cp s3://my-bucket/hello.txt ./hello-downloaded.t
 # Sync a local directory to a bucket
 aws s3 sync ./my-dir s3://my-bucket/my-dir/
 
@@ -370,36 +369,79 @@ SNS uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-
 
 Lambda uses a REST/JSON API over paths rooted at `/2015-03-31/`. The SigV4 credential scope `service=lambda` identifies requests.
 
-**Current status:** stub — all endpoints are routed correctly but return `501 Not Implemented`.
+### Execution model
 
-**Planned execution model:** Docker-based. On `Invoke`, Cloudish will run the function inside an official AWS Lambda base image (`amazon/aws-lambda-<runtime>`) using the Lambda Runtime Interface Emulator (RIE). The event JSON is POSTed to the container's local RIE endpoint and the response is returned to the caller. Function code (zip or image reference) is stored under `data/lambda/functions/{name}/`.
+Functions are executed via Docker using the AWS Lambda Runtime Interface Emulator (RIE), which is built into all official `public.ecr.aws/lambda/*` base images.
 
-**Planned trigger model:** Event source mappings (SQS, DynamoDB Streams) will spawn a per-mapping background tokio task that polls the source and invokes the function:
+On `Invoke`:
+1. Cloudish looks up the function config and checks for a running container in its in-memory map.
+2. If none, it runs `docker run --rm -d -p 0:8080 {image_uri}` and waits up to 10 s for the RIE to become ready.
+3. The container is kept alive and reused for subsequent invocations of the same function.
+4. The event JSON is POSTed to `http://127.0.0.1:{host_port}/2015-03-31/functions/function/invocations`.
+5. The response body and any `x-amz-function-error` header are returned to the caller.
 
-- **SQS** — `ReceiveMessage` up to `BatchSize`; on success delete the batch; on failure leave messages to expire/retry or move to DLQ if `maxReceiveCount` is exceeded.
-- **DynamoDB Streams** — `GetShardIterator` + `GetRecords` in a loop; deliver records as a `{"Records": [...]}` event.
+**Only image-based functions are supported** (`PackageType=Image` with an `ImageUri`). Zip-based functions return `501`.
 
-**Stubbed endpoints:**
+### Example
 
-| Method | Path | Operation |
-|--------|------|-----------|
-| POST | `/2015-03-31/functions` | CreateFunction |
-| GET | `/2015-03-31/functions` | ListFunctions |
-| GET | `/2015-03-31/functions/{name}` | GetFunction |
-| DELETE | `/2015-03-31/functions/{name}` | DeleteFunction |
-| PUT | `/2015-03-31/functions/{name}/code` | UpdateFunctionCode |
-| GET | `/2015-03-31/functions/{name}/configuration` | GetFunctionConfiguration |
-| PUT | `/2015-03-31/functions/{name}/configuration` | UpdateFunctionConfiguration |
-| POST | `/2015-03-31/functions/{name}/invocations` | Invoke |
-| GET/POST | `/2015-03-31/functions/{name}/aliases` | ListAliases / CreateAlias |
-| GET/PUT/DELETE | `/2015-03-31/functions/{name}/aliases/{alias}` | GetAlias / UpdateAlias / DeleteAlias |
-| GET/POST | `/2015-03-31/functions/{name}/policy` | GetPolicy / AddPermission |
-| DELETE | `/2015-03-31/functions/{name}/policy/{sid}` | RemovePermission |
-| GET/POST | `/2015-03-31/event-source-mappings` | ListEventSourceMappings / CreateEventSourceMapping |
-| GET/PUT/DELETE | `/2015-03-31/event-source-mappings/{uuid}` | GetEventSourceMapping / UpdateEventSourceMapping / DeleteEventSourceMapping |
-| GET | `/2015-03-31/layers` | ListLayers |
-| GET/POST | `/2015-03-31/layers/{name}/versions` | ListLayerVersions / PublishLayerVersion |
-| GET/DELETE | `/2015-03-31/layers/{name}/versions/{version}` | GetLayerVersion / DeleteLayerVersion |
+```bash
+# Create an image-based function
+aws lambda create-function \
+  --function-name my-fn \
+  --package-type Image \
+  --code ImageUri=public.ecr.aws/lambda/python:3.12 \
+  --role arn:aws:iam::000000000000:role/lambda-role \
+  --endpoint-url http://localhost:4566
+
+# Invoke it
+aws lambda invoke \
+  --function-name my-fn \
+  --payload '{"key":"value"}' \
+  response.json \
+  --endpoint-url http://localhost:4566
+
+cat response.json
+```
+
+### Event source mappings
+
+Creating an event source mapping spawns a background task that polls the source and invokes the function automatically:
+
+- **SQS** — receives up to `BatchSize` messages (default 10), invokes the function with a `{"Records":[...]}` event. On success the batch is deleted; on error the messages remain visible for retry or DLQ processing.
+- **DynamoDB Streams** — polls the stream storage directly with a shard iterator, delivers records as a `{"Records":[...]}` event, advances the iterator on each poll. Polling interval is 500 ms.
+
+```bash
+# Wire an SQS queue to a Lambda function
+aws lambda create-event-source-mapping \
+  --function-name my-fn \
+  --event-source-arn arn:aws:sqs:eu-west-1:000000000000:my-queue \
+  --batch-size 5 \
+  --endpoint-url http://localhost:4566
+```
+
+ESM tasks are started at server boot for all persisted mappings with `State=Enabled`.
+
+### Supported operations
+
+| Method | Path | Operation | Notes |
+|--------|------|-----------|-------|
+| POST | `/2015-03-31/functions` | CreateFunction | |
+| GET | `/2015-03-31/functions` | ListFunctions | |
+| GET | `/2015-03-31/functions/{name}` | GetFunction | |
+| DELETE | `/2015-03-31/functions/{name}` | DeleteFunction | Stops container |
+| PUT | `/2015-03-31/functions/{name}/code` | UpdateFunctionCode | Stops & restarts container |
+| GET | `/2015-03-31/functions/{name}/configuration` | GetFunctionConfiguration | |
+| PUT | `/2015-03-31/functions/{name}/configuration` | UpdateFunctionConfiguration | |
+| POST | `/2015-03-31/functions/{name}/invocations` | Invoke | Docker/RIE; Image only |
+| GET/POST | `/2015-03-31/functions/{name}/aliases` | ListAliases / CreateAlias | |
+| GET/PUT/DELETE | `/2015-03-31/functions/{name}/aliases/{alias}` | GetAlias / UpdateAlias / DeleteAlias | |
+| GET/POST | `/2015-03-31/functions/{name}/policy` | GetPolicy / AddPermission | |
+| DELETE | `/2015-03-31/functions/{name}/policy/{sid}` | RemovePermission | |
+| GET/POST | `/2015-03-31/event-source-mappings` | ListEventSourceMappings / CreateEventSourceMapping | |
+| GET/PUT/DELETE | `/2015-03-31/event-source-mappings/{uuid}` | GetEventSourceMapping / UpdateEventSourceMapping / DeleteEventSourceMapping | |
+| GET | `/2015-03-31/layers` | ListLayers | Returns empty list |
+| GET/POST | `/2015-03-31/layers/{name}/versions` | ListLayerVersions / PublishLayerVersion | Stub |
+| GET/DELETE | `/2015-03-31/layers/{name}/versions/{version}` | GetLayerVersion / DeleteLayerVersion | Stub |
 
 ## RDS proxy
 

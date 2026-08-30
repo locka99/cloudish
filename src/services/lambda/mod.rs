@@ -544,7 +544,7 @@ pub async fn invoke_function_internal(
 // ── ESM task management ──────────────────────────────────────────────────────
 
 /// Spawn a background task for an event source mapping.
-pub fn spawn_esm_task(state: &Arc<AppState>, esm: &StoredEventSourceMapping) {
+pub(crate) fn spawn_esm_task(state: &Arc<AppState>, esm: &StoredEventSourceMapping) {
     let handle = if esm.event_source_arn.contains(":sqs:") {
         let state_clone = state.clone();
         let esm_clone = esm.clone();
