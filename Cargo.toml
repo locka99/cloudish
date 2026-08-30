@@ -50,5 +50,7 @@ aws-sdk-iam = "1"
 aws-sdk-sts = "1"
 aws-sdk-sqs = "1"
 aws-sdk-ses = "1"
-reqwest = { version = "0.12", features = ["json"] }
+aws-sdk-appconfig = "1"
+aws-sdk-appconfigdata = "1"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 uuid = { version = "1", features = ["v4"] }

@@ -9,7 +9,7 @@ A local AWS emulator written in Rust. Provides HTTP API-compatible endpoints for
 | S3 | Implemented |
 | DynamoDB | Implemented |
 | Cognito | Implemented |
-| AppConfig | Stub |
+| AppConfig | Implemented |
 | RDS | Proxy (Postgres wire protocol) |
 | SES | Implemented |
 | SQS | Implemented |
@@ -242,6 +242,29 @@ SES uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-
 
 **Quota:** `GetSendQuota` returns static values (50 000 messages/day, 14 messages/second).
 
+## AppConfig-specific notes
+
+AppConfig uses a REST/JSON API (no `X-Amz-Target` header). The management plane (`aws-sdk-appconfig`) and the data plane (`aws-sdk-appconfigdata`) both route to the same port.
+
+**Management plane supported operations:**
+
+| Category | Operations |
+|----------|------------|
+| Applications | CreateApplication, GetApplication, ListApplications, UpdateApplication, DeleteApplication |
+| Environments | CreateEnvironment, GetEnvironment, ListEnvironments, UpdateEnvironment, DeleteEnvironment |
+| Configuration Profiles | CreateConfigurationProfile, GetConfigurationProfile, ListConfigurationProfiles, UpdateConfigurationProfile, DeleteConfigurationProfile |
+| Hosted Config Versions | CreateHostedConfigurationVersion, GetHostedConfigurationVersion, ListHostedConfigurationVersions, DeleteHostedConfigurationVersion |
+| Deployment Strategies | CreateDeploymentStrategy, GetDeploymentStrategy, ListDeploymentStrategies |
+| Deployments | StartDeployment, GetDeployment, ListDeployments, StopDeployment |
+
+**Data plane supported operations:** StartConfigurationSession, GetLatestConfiguration.
+
+**Built-in deployment strategies:** `AppConfig.AllAtOnce`, `AppConfig.Linear50PercentEvery30Seconds`, `AppConfig.Canary10Percent20Minutes`.
+
+**Deployments:** Deployments complete immediately as `COMPLETE`. The deployed configuration version is tracked per-environment.
+
+**Configuration sessions:** `StartConfigurationSession` returns an `InitialConfigurationToken`. `GetLatestConfiguration` (via `configuration_token` query parameter) returns the configuration content on the first call; subsequent calls with no new deployment return an empty body (304-equivalent).
+
 ## SNS-specific notes
 
 SNS uses the AWS Query protocol: `POST /` with `Content-Type: application/x-www-form-urlencoded` and an `Action=` parameter in the body (e.g. `Action=CreateTopic&Name=my-topic`). The SigV4 credential scope `service=sns` routes it automatically when using the AWS SDK with a custom endpoint.
@@ -334,6 +357,7 @@ cargo test --test cognito
 cargo test --test iam
 cargo test --test sqs
 cargo test --test ses
+cargo test --test appconfig
 
 # Show log output
 cargo test --test cognito -- --nocapture

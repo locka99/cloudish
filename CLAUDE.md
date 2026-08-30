@@ -73,9 +73,12 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 
 24. **Lambda wire format** — REST/JSON under `/2015-03-31/`. Routed by path. Currently a stub; all operations return `NotImplemented`.
 
+25. **AppConfig wire format** — REST/JSON. Management plane uses `aws-sdk-appconfig` (SigV4 credential scope `service=appconfig`). Data plane uses `aws-sdk-appconfigdata` (scope `service=appconfigdata`). Routes use real AWS API paths (`/applications`, `/deploymentstrategies`, `/configurationsessions`, `/configuration`) — axum's literal-route priority ensures these beat S3's `/{bucket}` wildcard. Deployments complete immediately as `COMPLETE`. GetLatestConfiguration receives the token via `configuration_token` query parameter. Response headers for hosted config versions use `Version-Number`, `Application-Id`, `Configuration-Profile-Id` (SDK-expected casing).
+
 ## Testing Rules
 
 - Every integration test **must** clean up all resources it creates (buckets, queues, tables, etc.), even if the test fails or panics.
 - Test data is stored under `data/test_{port}/` (isolated from `data/`). This directory is wiped at the start of each test run.
-- Use a drop-guard (`TestCleanup`) to ensure cleanup runs on panic. Never rely solely on an explicit `cleanup()` call at the end of a test body.
+- Use a drop-guard to ensure cleanup runs on panic. Never rely solely on an explicit `cleanup()` call at the end of a test body.
 - Each test must use a unique resource name (e.g. UUID-based bucket/queue/table name) to avoid cross-test interference when tests run in parallel.
+- **Drop guard cleanup must use raw TCP, not the AWS SDK client.** An SDK client created in one tokio runtime (e.g. `#[tokio::test]`) cannot be reused from a `Drop` impl that creates a new runtime — the connection pool background tasks aren't running in the new runtime, causing the call to hang indefinitely before reaching the server. Use `std::net::TcpStream` to send a raw HTTP request instead. `reqwest::blocking` has the same problem when called from within a tokio context.
