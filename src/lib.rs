@@ -20,6 +20,8 @@ async fn log_request_middleware(request: Request, next: Next) -> Response {
 }
 
 pub async fn build_app(state: Arc<AppState>) -> anyhow::Result<Router> {
+    crate::services::lambda::start_esm_tasks(&state).await;
+
     let app = Router::new()
         .merge(services::router(state.clone()))
         .layer(middleware::from_fn(log_request_middleware))

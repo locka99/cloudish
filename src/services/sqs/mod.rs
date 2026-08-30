@@ -194,6 +194,66 @@ fn receipt_index_path(queue_name: &str, receipt_handle: &str) -> String {
     format!("queues/{queue_name}/receipts/{receipt_handle}")
 }
 
+// ── Public helpers for Lambda ESM ────────────────────────────────────────────
+
+/// A message record returned to Lambda ESM consumers.
+pub struct EsmRecord {
+    pub message_id: String,
+    pub receipt_handle: String,
+    pub body: String,
+    pub md5_of_body: String,
+    pub attributes: HashMap<String, String>,
+    pub queue_arn: String,
+}
+
+/// For Lambda ESM: receive up to batch_size visible messages, set them invisible for 30s.
+pub async fn receive_batch_for_esm(
+    state: &Arc<AppState>,
+    queue_name: &str,
+    batch_size: usize,
+) -> Vec<EsmRecord> {
+    let messages = match pick_visible_messages(&state.sqs, queue_name, batch_size, 30, false).await {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!("ESM receive_batch_for_esm error: {e}");
+            return vec![];
+        }
+    };
+    let arn = format!("arn:aws:sqs:{REGION}:{ACCOUNT_ID}:{queue_name}");
+    messages
+        .into_iter()
+        .map(|m| EsmRecord {
+            message_id: m.message_id,
+            receipt_handle: m.receipt_handle,
+            body: m.body,
+            md5_of_body: m.md5_of_body,
+            attributes: m.attributes,
+            queue_arn: arn.clone(),
+        })
+        .collect()
+}
+
+/// For Lambda ESM: delete a message after successful invocation.
+pub async fn delete_message_for_esm(
+    state: &Arc<AppState>,
+    queue_name: &str,
+    receipt_handle: &str,
+) {
+    let msg_id = match find_msg_id_by_receipt(&state.sqs, queue_name, receipt_handle).await {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            tracing::warn!("ESM delete_message_for_esm: receipt handle not found: {receipt_handle}");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("ESM delete_message_for_esm error looking up receipt: {e}");
+            return;
+        }
+    };
+    let _ = state.sqs.delete(&msg_path(queue_name, &msg_id)).await;
+    let _ = state.sqs.delete(&receipt_index_path(queue_name, receipt_handle)).await;
+}
+
 // ── Public helper for internal use (e.g. SNS delivery) ──────────────────────
 
 /// Enqueue a plain-text message to a queue by name.

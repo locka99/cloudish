@@ -9,6 +9,7 @@ pub mod ses;
 pub mod sns;
 pub mod sqs;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -35,6 +36,10 @@ pub struct AppState {
     pub lambda: Arc<FileStorage>,
     // RDS is backed by a real Postgres connection — config held separately.
     pub rds_dsn: String,
+    /// Running ESM background task abort handles, keyed by ESM UUID.
+    pub esm_tasks: Arc<tokio::sync::Mutex<HashMap<String, tokio::task::AbortHandle>>>,
+    /// Running Lambda containers: function_name → (container_id, host_port).
+    pub lambda_containers: Arc<tokio::sync::Mutex<HashMap<String, (String, u16)>>>,
 }
 
 impl AppState {
@@ -56,6 +61,8 @@ impl AppState {
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             rds_dsn: std::env::var("RDS_DSN")
                 .unwrap_or_else(|_| "postgresql://localhost/cloudish".into()),
+            esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            lambda_containers: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         })
     }
 
@@ -72,6 +79,8 @@ impl AppState {
             sns: Arc::new(FileStorage::new(base.join("sns")).await?),
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             rds_dsn: config.rds.proxy_dsn.clone(),
+            esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            lambda_containers: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         })
     }
 }
