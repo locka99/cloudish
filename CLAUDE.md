@@ -10,6 +10,7 @@ This project shall emulate the APIs for following AWS services
 - IAM (basics)
 - SNS
 - Lambda
+- IoT (control plane)
 - CloudWatch
 
 For each of these the APIs will be backed by persistent storage that will hold data under a subdirectory of `data/`
@@ -74,6 +75,8 @@ Services will test basic AWS credentials to apply IAM policy to the session.
 24. **Lambda wire format** — REST/JSON under `/2015-03-31/`. Routed by path. Fully implemented. Execution model: Docker via the AWS Lambda Runtime Interface Emulator (RIE) — `docker run --rm -d -p 0:8080 {image_uri}`, wait for RIE readiness, POST event JSON to the container's local RIE endpoint, return response. Container is reused across invocations; stopped on DeleteFunction or UpdateFunctionCode. Only `PackageType=Image` functions are invocable (Zip returns 501). Running containers tracked in `AppState.lambda_containers`. Event source mappings (SQS, DynamoDB Streams) spawn a per-mapping background tokio task (`spawn_esm_task`); abort handles stored in `AppState.esm_tasks`. On SQS success delete the batch; on failure leave messages. On DynamoDB Streams advance the shard iterator by reading stream storage directly. `start_esm_tasks` is called from `build_app` to resume tasks for persisted Enabled ESMs.
 
 25. **AppConfig wire format** — REST/JSON. Management plane uses `aws-sdk-appconfig` (SigV4 credential scope `service=appconfig`). Data plane uses `aws-sdk-appconfigdata` (scope `service=appconfigdata`). Routes use real AWS API paths (`/applications`, `/deploymentstrategies`, `/configurationsessions`, `/configuration`) — axum's literal-route priority ensures these beat S3's `/{bucket}` wildcard. Deployments complete immediately as `COMPLETE`. GetLatestConfiguration receives the token via `configuration_token` query parameter. Response headers for hosted config versions use `Version-Number`, `Application-Id`, `Configuration-Profile-Id` (SDK-expected casing).
+
+26. **IoT wire format** — REST/JSON. SigV4 credential scope `service=iot`. Routes are literal paths (`/things`, `/certificates`, `/policies`, etc.) — axum's literal-route priority ensures these beat S3's `/{bucket}` wildcard. Certificates are ECDSA P-256 self-signed X.509 generated via `rcgen`; certificate ID is the lowercase hex SHA-256 of the certificate PEM (64 chars). Private key is stored in the emulator for retrieval but is only returned on `CreateKeysAndCertificate`. MQTT broker is **not implemented** — `GetEndpoint` returns `localhost:8883` as a placeholder. Policy version IDs are numeric strings ("1", "2", …); version "1" is the default on creation. `AttachPolicy`/`DetachPolicy` use `PUT /target-policies/{policyName}` with body `{"target":"..."}`. `AttachThingPrincipal`/`DetachThingPrincipal` read the principal from the `x-amzn-principal` request header. Storage layout under `data/iot/`: `things/`, `thing_types/`, `certificates/`, `policies/`, `policy_versions/{name}/`, `policy_targets/{name}/`, `thing_principals/{name}/`.
 
 ## Testing Rules
 

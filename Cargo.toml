@@ -41,6 +41,7 @@ bcrypt = "0.15"
 serde_urlencoded = "0.7"
 urlencoding = "2"
 reqwest = { version = "0.12", features = ["json"] }
+rcgen = "0.13"
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -55,5 +56,6 @@ aws-sdk-ses = "1"
 aws-sdk-appconfig = "1"
 aws-sdk-appconfigdata = "1"
 aws-sdk-sns = "1"
+aws-sdk-iot = "1"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 uuid = { version = "1", features = ["v4"] }

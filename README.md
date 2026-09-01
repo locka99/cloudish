@@ -19,6 +19,7 @@ It provides HTTP API-compatible endpoints for common AWS services on a single po
 | IAM | Implemented |
 | SNS | Implemented |
 | Lambda | Implemented |
+| IoT | Implemented (control plane; MQTT not supported) |
 | CloudWatch | Not started |
 
 ## Requirements
@@ -170,7 +171,8 @@ data/
 ├── sqs/         # Queues and messages
 ├── iam/         # IAM data
 ├── sns/         # Topics and subscriptions
-└── lambda/      # Functions and event source mappings
+├── lambda/      # Functions and event source mappings
+└── iot/         # Things, certificates, policies, and attachments
 ```
 
 Delete the `data/` directory to reset all state.
@@ -448,6 +450,46 @@ ESM tasks are started at server boot for all persisted mappings with `State=Enab
 | GET/POST | `/2015-03-31/layers/{name}/versions` | ListLayerVersions / PublishLayerVersion | Stub |
 | GET/DELETE | `/2015-03-31/layers/{name}/versions/{version}` | GetLayerVersion / DeleteLayerVersion | Stub |
 
+## IoT-specific notes
+
+IoT uses a REST/JSON API. The SigV4 credential scope `service=iot` routes requests automatically when using the AWS SDK with a custom endpoint.
+
+**Supported operations:**
+
+| Category | Operations |
+|----------|-----------|
+| Things | CreateThing, DescribeThing, ListThings, DeleteThing, UpdateThing |
+| Thing Types | CreateThingType, DescribeThingType, ListThingTypes, DeleteThingType |
+| Certificates | CreateKeysAndCertificate, DescribeCertificate, ListCertificates, DeleteCertificate, UpdateCertificate |
+| Policies | CreatePolicy, GetPolicy, ListPolicies, DeletePolicy, CreatePolicyVersion, GetPolicyVersion, ListPolicyVersions, DeletePolicyVersion, SetDefaultPolicyVersion |
+| Attach/Detach | AttachPolicy, DetachPolicy, ListAttachedPolicies, AttachThingPrincipal, DetachThingPrincipal, ListThingPrincipals, ListPrincipalThings |
+| Endpoint | GetEndpoint |
+
+**Certificates:** `CreateKeysAndCertificate` generates a real ECDSA P-256 self-signed X.509 certificate, returning the certificate PEM, public key PEM, and private key PEM. The private key is only available at creation time. The certificate ID is the lowercase hex SHA-256 of the certificate PEM (64 characters), matching the AWS format.
+
+**MQTT:** The data plane (MQTT broker) is **not implemented**. `GetEndpoint` returns `localhost:8883` as a placeholder. Device connectivity can be added later without changing the control plane.
+
+**Example (AWS CLI):**
+```bash
+# Create a thing
+aws iot create-thing --thing-name my-sensor --endpoint-url http://localhost:4566
+
+# Create a certificate and keys
+aws iot create-keys-and-certificate --set-as-active --endpoint-url http://localhost:4566
+
+# Create a policy
+aws iot create-policy \
+  --policy-name my-policy \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"iot:*","Resource":"*"}]}' \
+  --endpoint-url http://localhost:4566
+
+# Attach policy to certificate
+aws iot attach-policy \
+  --policy-name my-policy \
+  --target arn:aws:iot:eu-west-1:000000000000:cert/<cert-id> \
+  --endpoint-url http://localhost:4566
+```
+
 ## RDS proxy
 
 When the RDS proxy is enabled, Cloudish accepts Postgres wire-protocol connections on `rds.proxy_port` (default: `5433`) and forwards them to the database at `rds.proxy_dsn`. The management-plane API (CreateDBInstance, etc.) returns `NotImplemented`.
@@ -506,6 +548,7 @@ cargo test --test sqs
 cargo test --test ses
 cargo test --test appconfig
 cargo test --test sns
+cargo test --test iot
 
 # Show log output
 cargo test --test cognito -- --nocapture

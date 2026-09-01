@@ -2,6 +2,7 @@ pub mod appconfig;
 pub mod cognito;
 pub mod dynamodb;
 pub mod iam;
+pub mod iot;
 pub mod lambda;
 pub mod rds;
 pub mod s3;
@@ -34,6 +35,7 @@ pub struct AppState {
     pub iam: Arc<FileStorage>,
     pub sns: Arc<FileStorage>,
     pub lambda: Arc<FileStorage>,
+    pub iot: Arc<FileStorage>,
     // RDS is backed by a real Postgres connection — config held separately.
     pub rds_dsn: String,
     /// Running ESM background task abort handles, keyed by ESM UUID.
@@ -59,6 +61,7 @@ impl AppState {
             iam: Arc::new(FileStorage::new(base.join("iam")).await?),
             sns: Arc::new(FileStorage::new(base.join("sns")).await?),
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
+            iot: Arc::new(FileStorage::new(base.join("iot")).await?),
             rds_dsn: std::env::var("RDS_DSN")
                 .unwrap_or_else(|_| "postgresql://localhost/cloudish".into()),
             esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -78,6 +81,7 @@ impl AppState {
             iam: Arc::new(FileStorage::new(base.join("iam")).await?),
             sns: Arc::new(FileStorage::new(base.join("sns")).await?),
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
+            iot: Arc::new(FileStorage::new(base.join("iot")).await?),
             rds_dsn: config.rds.proxy_dsn.clone(),
             esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             lambda_containers: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -138,4 +142,5 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .merge(iam::router())
         .merge(sns::router())
         .merge(lambda::router())
+        .merge(iot::router())
 }
