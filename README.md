@@ -43,6 +43,10 @@ cargo run
 
 # Or run the compiled binary
 ./target/release/cloudish
+
+# Point at a specific config file
+./target/release/cloudish --config /path/to/my-config.yaml
+cargo run -- --config /path/to/my-config.yaml
 ```
 
 Cloudish listens on `0.0.0.0:4566` by default and loads configuration from `cloudish.yaml` in the current directory. If no local config is found it falls back to `~/.cloudish/config.yaml`.
@@ -96,8 +100,9 @@ logging:
 
 ### Configuration resolution order
 
-1. `./cloudish.yaml` (current working directory)
-2. `~/.cloudish/config.yaml`
+1. `--config <FILE>` flag (explicit path, skips all fallbacks)
+2. `./cloudish.yaml` (current working directory)
+3. `~/.cloudish/config.yaml`
 
 ### Logging
 
