@@ -173,8 +173,9 @@ async fn test_get_metric_statistics() {
     }
 
     let now = chrono::Utc::now();
-    let start = (now - chrono::Duration::hours(1)).to_rfc3339();
-    let end = (now + chrono::Duration::hours(1)).to_rfc3339();
+    // AWS SDK DateTime only supports "Z" suffix, not "+00:00"
+    let start = (now - chrono::Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let end = (now + chrono::Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let resp = client
         .get_metric_statistics()

@@ -1,4 +1,6 @@
 pub mod appconfig;
+pub mod cloudwatch;
+pub mod cloudwatch_logs;
 pub mod cognito;
 pub mod dynamodb;
 pub mod iam;
@@ -36,6 +38,8 @@ pub struct AppState {
     pub sns: Arc<FileStorage>,
     pub lambda: Arc<FileStorage>,
     pub iot: Arc<FileStorage>,
+    pub cloudwatch: Arc<FileStorage>,
+    pub cloudwatch_logs: Arc<FileStorage>,
     // RDS is backed by a real Postgres connection — config held separately.
     pub rds_dsn: String,
     /// Running ESM background task abort handles, keyed by ESM UUID.
@@ -62,6 +66,8 @@ impl AppState {
             sns: Arc::new(FileStorage::new(base.join("sns")).await?),
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             iot: Arc::new(FileStorage::new(base.join("iot")).await?),
+            cloudwatch: Arc::new(FileStorage::new(base.join("cloudwatch")).await?),
+            cloudwatch_logs: Arc::new(FileStorage::new(base.join("cloudwatch_logs")).await?),
             rds_dsn: std::env::var("RDS_DSN")
                 .unwrap_or_else(|_| "postgresql://localhost/cloudish".into()),
             esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -82,6 +88,8 @@ impl AppState {
             sns: Arc::new(FileStorage::new(base.join("sns")).await?),
             lambda: Arc::new(FileStorage::new(base.join("lambda")).await?),
             iot: Arc::new(FileStorage::new(base.join("iot")).await?),
+            cloudwatch: Arc::new(FileStorage::new(base.join("cloudwatch")).await?),
+            cloudwatch_logs: Arc::new(FileStorage::new(base.join("cloudwatch_logs")).await?),
             rds_dsn: config.rds.proxy_dsn.clone(),
             esm_tasks: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             lambda_containers: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -107,6 +115,8 @@ async fn top_level_dispatch(
         || target.starts_with("AWSCognitoIdentityProviderService.")
     {
         cognito::dispatch(state, request).await.into_response()
+    } else if target.starts_with("Logs_") {
+        cloudwatch_logs::dispatch(state, request).await.into_response()
     } else {
         // Route by service from SigV4 credential scope
         let service = request
@@ -120,6 +130,7 @@ async fn top_level_dispatch(
             "sqs" => sqs::service_dispatch(State(state.0.clone()), request).await.into_response(),
             "sns" => sns::dispatch(State(state.0.clone()), request).await.into_response(),
             "email" | "ses" => ses::dispatch(State(state.0.clone()), request).await.into_response(),
+            "monitoring" => cloudwatch::dispatch(State(state.0.clone()), request).await.into_response(),
             _ => {
                 tracing::warn!(target = %target, service = %service, "unknown target/service");
                 (StatusCode::BAD_REQUEST, format!("unknown target: {target}")).into_response()
@@ -143,4 +154,5 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .merge(sns::router())
         .merge(lambda::router())
         .merge(iot::router())
+        .merge(cloudwatch::router())
 }

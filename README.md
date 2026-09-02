@@ -20,7 +20,7 @@ It provides HTTP API-compatible endpoints for common AWS services on a single po
 | SNS | Implemented |
 | Lambda | Implemented |
 | IoT | Implemented (control plane; MQTT not supported) |
-| CloudWatch | Not started |
+| CloudWatch | Implemented (metrics, alarms, logs) |
 
 ## Requirements
 
@@ -172,7 +172,9 @@ data/
 ├── iam/         # IAM data
 ├── sns/         # Topics and subscriptions
 ├── lambda/      # Functions and event source mappings
-└── iot/         # Things, certificates, policies, and attachments
+├── iot/         # Things, certificates, policies, and attachments
+├── cloudwatch/  # Metrics (namespaces/metric_name.json) and alarms
+└── cloudwatch_logs/  # Log groups, streams, and events
 ```
 
 Delete the `data/` directory to reset all state.
@@ -490,6 +492,31 @@ aws iot attach-policy \
   --endpoint-url http://localhost:4566
 ```
 
+## CloudWatch-specific notes
+
+CloudWatch is split into two services with different wire formats:
+
+### CloudWatch (metrics and alarms)
+
+Uses the **Smithy RPCv2-CBOR** protocol (used by `aws-sdk-cloudwatch` v1). Requests go to `/service/GraniteServiceVersion20100801/operation/{OperationName}` with CBOR-encoded bodies. SigV4 credential scope `service=monitoring`.
+
+**Supported operations:**
+
+| Category | Operations |
+|----------|-----------|
+| Metrics | PutMetricData, ListMetrics, GetMetricStatistics |
+| Alarms | PutMetricAlarm, DescribeAlarms, SetAlarmState, DeleteAlarms |
+
+Metric data points are stored per (Namespace, MetricName) under `data/cloudwatch/metrics/`. `GetMetricStatistics` returns a single aggregated datapoint over the requested time range. Alarms are created with initial state `INSUFFICIENT_DATA`.
+
+### CloudWatch Logs
+
+Uses the **JSON API** with `X-Amz-Target: Logs_20140328.{Operation}` header. SigV4 credential scope `service=logs`.
+
+**Supported operations:** CreateLogGroup, DeleteLogGroup, DescribeLogGroups, CreateLogStream, DeleteLogStream, DescribeLogStreams, PutLogEvents, GetLogEvents, FilterLogEvents.
+
+`PutLogEvents` auto-creates the log group and stream if they don't exist. `FilterLogEvents` supports case-sensitive substring matching on the message field (full CloudWatch filter syntax not supported). Storage under `data/cloudwatch_logs/`.
+
 ## RDS proxy
 
 When the RDS proxy is enabled, Cloudish accepts Postgres wire-protocol connections on `rds.proxy_port` (default: `5433`) and forwards them to the database at `rds.proxy_dsn`. The management-plane API (CreateDBInstance, etc.) returns `NotImplemented`.
@@ -549,6 +576,8 @@ cargo test --test ses
 cargo test --test appconfig
 cargo test --test sns
 cargo test --test iot
+cargo test --test cloudwatch
+cargo test --test cloudwatch_logs
 
 # Show log output
 cargo test --test cognito -- --nocapture
