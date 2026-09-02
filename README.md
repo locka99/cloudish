@@ -225,7 +225,8 @@ aws s3 cp ./hello.txt s3://my-bucket/hello.txt
 aws s3 ls s3://my-bucket
 
 # Download a file
-aws s3 cp s3://my-bucket/hello.txt ./hello-downloaded.t
+aws s3 cp s3://my-bucket/hello.txt ./hello-downloaded.txt
+
 # Sync a local directory to a bucket
 aws s3 sync ./my-dir s3://my-bucket/my-dir/
 
