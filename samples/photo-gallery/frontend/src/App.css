@@ -1,0 +1,200 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  min-height: 100vh;
+}
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+
+.app-header {
+  padding: 2.5rem 0 1.5rem;
+  text-align: center;
+}
+
+.app-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.app-subtitle {
+  margin-top: 0.4rem;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.app-subtitle a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.app-subtitle a:hover {
+  text-decoration: underline;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Upload zone ──────────────────────────────────────────────────────────── */
+
+.upload-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #aab;
+  border-radius: 12px;
+  background: #fff;
+  padding: 2.5rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+  font-size: 1rem;
+  color: #555;
+}
+
+.upload-zone:hover,
+.upload-zone--active {
+  border-color: #0066cc;
+  background: #e8f0fe;
+  color: #0066cc;
+}
+
+.upload-zone--busy {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upload-zone__input {
+  display: none;
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────── */
+
+.error-banner {
+  background: #fdecea;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+}
+
+/* ── Loading / empty ──────────────────────────────────────────────────────── */
+
+.loading,
+.gallery-empty {
+  text-align: center;
+  color: #888;
+  padding: 3rem 1rem;
+  font-size: 1rem;
+}
+
+/* ── Photo grid ───────────────────────────────────────────────────────────── */
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Photo card ───────────────────────────────────────────────────────────── */
+
+.photo-card {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.photo-card--deleting {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.photo-card__img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #eee;
+}
+
+.photo-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+  color: #555;
+  border-top: 1px solid #eee;
+}
+
+.photo-card__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-card__size {
+  flex-shrink: 0;
+  color: #999;
+}
+
+.photo-card__delete {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.photo-card__delete:hover {
+  background: #fdecea;
+  color: #c0392b;
+}
+
+.photo-card__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

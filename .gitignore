@@ -2,3 +2,5 @@
 /data
 /.claude
 /.idea
+/samples/photo-gallery/frontend/node_modules/
+/samples/photo-gallery/backend/target/
