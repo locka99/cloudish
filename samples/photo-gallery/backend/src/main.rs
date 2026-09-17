@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{DefaultBodyLimit, Multipart, Path, State},
     http::{Method, StatusCode},
     routing::{delete, get, post},
     Json, Router,
@@ -98,7 +98,10 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/photos", get(list_photos))
-        .route("/api/photos", post(upload_photo))
+        .route(
+            "/api/photos",
+            post(upload_photo).layer(DefaultBodyLimit::max(100 * 1024 * 1024)), // 100 MB
+        )
         .route("/api/photos/presign-upload", post(presign_upload))
         .route("/api/photos/{key}", delete(delete_photo))
         .layer(cors)
@@ -252,7 +255,10 @@ async fn upload_photo(
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        tracing::error!("multipart read failed: {e}");
+        StatusCode::BAD_REQUEST
+    })? {
         let filename = field
             .file_name()
             .unwrap_or("photo.jpg")
@@ -261,12 +267,17 @@ async fn upload_photo(
             .content_type()
             .unwrap_or("image/jpeg")
             .to_string();
-        let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
+        let data = field.bytes().await.map_err(|e| {
+            tracing::error!("reading bytes for '{filename}' failed: {e}");
+            StatusCode::BAD_REQUEST
+        })?;
 
         // Use {uuid}.{ext} so the key never contains a slash and can be
         // used directly as a URL path segment.
         let ext = filename.rsplit('.').next().unwrap_or("jpg").to_lowercase();
         let key = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+
+        tracing::info!("uploading '{filename}' ({} bytes, {content_type}) as '{key}'", data.len());
 
         state
             .s3
@@ -278,11 +289,11 @@ async fn upload_photo(
             .send()
             .await
             .map_err(|e| {
-                tracing::error!("put_object failed: {e}");
+                tracing::error!("upload failed for '{filename}' -> '{key}': {e}");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
 
-        tracing::info!("Uploaded '{key}'");
+        tracing::info!("upload succeeded: '{filename}' -> '{key}'");
         return Ok(Json(serde_json::json!({ "key": key })));
     }
 
@@ -304,6 +315,8 @@ async fn presign_upload(
     let presign_cfg = PresigningConfig::expires_in(Duration::from_secs(300))
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    tracing::info!("generating presigned PUT URL for '{}' ({})", req.filename, req.content_type);
+
     let presigned = state
         .s3
         .put_object()
@@ -313,10 +326,11 @@ async fn presign_upload(
         .presigned(presign_cfg)
         .await
         .map_err(|e| {
-            tracing::error!("presign PUT failed: {e}");
+            tracing::error!("presign PUT failed for '{}': {e}", req.filename);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    tracing::info!("presigned PUT URL generated: '{}' -> '{key}'", req.filename);
     Ok(Json(UploadUrlResponse {
         url: presigned.uri().to_string(),
         key,
